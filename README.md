@@ -18,6 +18,15 @@ A co-op island salvage prototype networked with Netcode for GameObjects.
 
 ## Controls
 
+> Controls are finalized once the player controller is implemented (Day 1). Placeholder:
+
+| Action | Key |
+|---|---|
+| Move | WASD |
+| Look | Mouse |
+| Interact / Pick up | E |
+| Fire | Left Mouse Button |
+| Enter/Exit boat | F |
 
 ## Known Limitations
 
