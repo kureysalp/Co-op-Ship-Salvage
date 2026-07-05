@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ffe2ba61dbb241b6b9632320bfe0afbe, type: 3}
+  m_Name: SO_Item_Gun
+  m_EditorClassIdentifier: Assembly-CSharp::_Project.Scripts.Game.ItemObject
+  _uId: 53f8a9b5406995547a2553990b7d80f5
+  _itemName: Gun
+  _itemIcon: {fileID: 21300000, guid: b48c1bfac95ba844d85f432d7b47b622, type: 3}
+  _isStackable: 0
+  _itemType: 2
+  _equipPrefab: {fileID: 7838589709298968688, guid: bce3ffde151b754479d9aa04676b295b, type: 3}
