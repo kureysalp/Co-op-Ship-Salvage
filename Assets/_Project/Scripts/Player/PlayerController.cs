@@ -1,5 +1,6 @@
 using ShipSalvage.Boats;
 using ShipSalvage.UI;
+using ShipSalvage.Utils;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
@@ -48,6 +49,7 @@ namespace ShipSalvage.Player
         private AnticipatedNetworkTransform _ant;
         private PlayerInventory _inventory;
         private PlayerEquipment _equipment;
+        private Health _health;
 
         private InputAction _moveAction;
         private InputAction _lookAction;
@@ -133,6 +135,10 @@ namespace ShipSalvage.Player
                 _shipLastPos = transform.position;
                 _shipLastYaw = transform.eulerAngles.y;
                 _serverInput.Yaw = transform.eulerAngles.y;
+
+                _health = GetComponent<Health>();
+                if (_health != null)
+                    _health.OnDeath += HandleServerDeath;
             }
 
             _shipRef.OnValueChanged += OnShipRefChanged;
@@ -169,6 +175,9 @@ namespace ShipSalvage.Player
         public override void OnNetworkDespawn()
         {
             Core.PlayerManager.Instance.Unregister(OwnerClientId);
+
+            if (IsServer && _health != null)
+                _health.OnDeath -= HandleServerDeath;
 
             _shipRef.OnValueChanged -= OnShipRefChanged;
 
@@ -406,6 +415,27 @@ namespace ShipSalvage.Player
 
             _currentShip = null;
             _shipRef.Value = default;
+        }
+
+        private void HandleServerDeath(ulong instigatorClientId)
+        {
+            if (!IsServer) return;
+
+            var spawn = Core.SpawnPoints.Instance != null ? Core.SpawnPoints.Instance.GetPlayerSpawn() : Vector3.zero;
+
+            _pilotMode = false;
+            _currentShip = null;
+            _shipRef.Value = default;
+
+            _cc.enabled = false;
+            transform.position = spawn;
+            _cc.enabled = true;
+
+            _velocity = Vector3.zero;
+            _pendingJump = false;
+
+            if (_health != null)
+                _health.ResetHealth();
         }
         
         public void ServerBeginPilot(BoatController ship, Vector3 pos, Quaternion rot)

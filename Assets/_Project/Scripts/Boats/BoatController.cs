@@ -31,9 +31,11 @@ namespace ShipSalvage.Boats
         private float _lastYaw;
         private float _steerInput;
         private float _throttleInput;
+        private PlayerBoatPilot _playerPilot;
         private Coroutine _wheelReturnCoroutine;
 
         private readonly List<Rigidbody> _rbPassengers = new();
+        private readonly List<IBoatRider> _riders = new();
         private Color _wheelOriginalColor;
         private Renderer _wheelRenderer;
 
@@ -44,6 +46,7 @@ namespace ShipSalvage.Boats
         private void Awake()
         {
             _rb = GetComponent<Rigidbody>();
+            _playerPilot = GetComponent<PlayerBoatPilot>();
             if (_wheelMesh != null)
             {
                 _wheelRenderer = _wheelMesh.GetComponent<Renderer>();
@@ -75,7 +78,7 @@ namespace ShipSalvage.Boats
             
             var horiz = new Vector3(_rb.linearVelocity.x, 0f, _rb.linearVelocity.z);
             
-            if (_pilotId.Value != ulong.MaxValue && Mathf.Abs(_throttleInput) > 0.001f)
+            if (Mathf.Abs(_throttleInput) > 0.001f)
                 horiz += transform.forward * (_acceleration * _throttleInput * Time.fixedDeltaTime);
             
             horiz = Vector3.MoveTowards(horiz, Vector3.zero, _drag * Time.fixedDeltaTime);
@@ -90,7 +93,7 @@ namespace ShipSalvage.Boats
             if (_wheelMesh != null)
                 _wheelMesh.localRotation = Quaternion.Euler(0f, 0f, -_wheelAngle.Value);
 
-            if (_pilotId.Value != ulong.MaxValue && Mathf.Abs(_steerInput) > 0.001f)
+            if (Mathf.Abs(_steerInput) > 0.001f)
             {
                 _wheelAngle.Value = Mathf.Clamp(
                     _wheelAngle.Value + _steerInput * _steeringRate * Time.fixedDeltaTime,
@@ -112,6 +115,18 @@ namespace ShipSalvage.Boats
                         var rotationMove = (Quaternion.Euler(0f, deltaYaw, 0f) * offset) - offset;
                         rb.MovePosition(rb.position + deltaPos + rotationMove);
                     }
+                }
+
+                for (int i = _riders.Count - 1; i >= 0; i--)
+                {
+                    var rider = _riders[i];
+                    if (rider is Component c && c == null)
+                    {
+                        _riders.RemoveAt(i);
+                        continue;
+                    }
+
+                    rider.RideBoat(deltaPos, deltaYaw, transform.position);
                 }
             }
         }
@@ -139,6 +154,8 @@ namespace ShipSalvage.Boats
 
             if (IsServer)
             {
+                if (other.GetComponentInParent<IBoatRider>() != null) return;
+
                 var rb = other.GetComponentInParent<Rigidbody>();
                 if (rb != null && !_rbPassengers.Contains(rb))
                     _rbPassengers.Add(rb);
@@ -156,10 +173,29 @@ namespace ShipSalvage.Boats
 
             if (IsServer)
             {
+                if (other.GetComponentInParent<IBoatRider>() != null) return;
+
                 var rb = other.GetComponentInParent<Rigidbody>();
                 if (rb != null)
                     _rbPassengers.Remove(rb);
             }
+        }
+
+        public void AddRider(IBoatRider rider)
+        {
+            if (!IsServer || rider == null) return;
+            if (_riders.Contains(rider)) return;
+
+            _riders.Add(rider);
+            rider.BoardBoat(this);
+        }
+
+        public void RemoveRider(IBoatRider rider)
+        {
+            if (rider == null) return;
+
+            if (_riders.Remove(rider))
+                rider.LeaveBoat(this);
         }
         
         public bool CanInteract(PlayerController player) =>
@@ -192,6 +228,7 @@ namespace ShipSalvage.Boats
             _pilotId.Value = clientId;
             _steerInput = 0f;
             _throttleInput = 0f;
+            _playerPilot?.SetHumanInput(0f, 0f);
 
             if (_wheelReturnCoroutine != null)
             {
@@ -236,6 +273,14 @@ namespace ShipSalvage.Boats
         public void SetPilotInputServerRpc(float steer, float throttle, ServerRpcParams rpcParams = default)
         {
             if (rpcParams.Receive.SenderClientId != _pilotId.Value) return;
+            _playerPilot?.SetHumanInput(steer, throttle);
+        }
+
+        public bool HasHumanPilot => _pilotId.Value != ulong.MaxValue;
+
+        public void SetInput(float steer, float throttle)
+        {
+            if (!IsServer) return;
             _steerInput = steer;
             _throttleInput = throttle;
         }

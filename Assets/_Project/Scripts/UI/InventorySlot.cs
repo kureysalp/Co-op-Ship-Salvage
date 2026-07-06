@@ -19,9 +19,10 @@ namespace ShipSalvage.UI
         public int Index { get; private set; }
         public ItemHolder Holder => _holder;
 
-        public void Configure(int index)
+        public void Configure(int index, SlotKind kind)
         {
             Index = index;
+            _kind = kind;
             SetActiveHighlight(false);
         }
 

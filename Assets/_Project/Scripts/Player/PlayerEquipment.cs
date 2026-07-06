@@ -1,4 +1,3 @@
-using System;
 using _Project.Scripts.Game;
 using Unity.Collections;
 using Unity.Netcode;
@@ -13,14 +12,11 @@ namespace ShipSalvage.Player
         private readonly NetworkVariable<FixedString64Bytes> _equippedItemId = new();
 
         private PlayerInventory _inventory;
-        private GameObject _currentVisual;
-        private Item _currentItem;
-
-        public event Action OnEquippedChanged;
+        private NetworkObject _spawnedWeapon;
 
         public FixedString64Bytes EquippedItemId => _equippedItemId.Value;
         public bool HasEquipped => _equippedItemId.Value.Length > 0;
-        public GameObject CurrentVisual => _currentVisual;
+        public Transform HandSocket => _handSocket;
 
         private void Awake()
         {
@@ -29,21 +25,17 @@ namespace ShipSalvage.Player
 
         public override void OnNetworkSpawn()
         {
-            _equippedItemId.OnValueChanged += HandleEquippedChanged;
-            RefreshVisual();
-
             if (IsServer && _inventory != null)
                 _inventory.OnInventoryChanged += HandleInventoryChanged;
         }
 
         public override void OnNetworkDespawn()
         {
-            _equippedItemId.OnValueChanged -= HandleEquippedChanged;
-
             if (IsServer && _inventory != null)
                 _inventory.OnInventoryChanged -= HandleInventoryChanged;
 
-            DestroyVisual();
+            if (IsServer)
+                DespawnWeapon();
         }
 
         public void RequestEquip(FixedString64Bytes itemId)
@@ -66,19 +58,50 @@ namespace ShipSalvage.Player
             if (!item.IsEquipable) return;
 
             _equippedItemId.Value = itemId;
+            SpawnWeapon(item);
         }
 
         [ServerRpc]
         private void UnequipRequestServerRpc()
         {
             _equippedItemId.Value = default;
+            DespawnWeapon();
         }
 
         private void HandleInventoryChanged(NetworkListEvent<InventoryItem> _)
         {
             if (_equippedItemId.Value.Length == 0) return;
-            if (!InventoryContains(_equippedItemId.Value))
-                _equippedItemId.Value = default;
+            if (InventoryContains(_equippedItemId.Value)) return;
+
+            _equippedItemId.Value = default;
+            DespawnWeapon();
+        }
+
+        private void SpawnWeapon(ItemObject item)
+        {
+            DespawnWeapon();
+
+            if (item.EquipPrefab == null) return;
+
+            var instance = Instantiate(item.EquipPrefab);
+            if (!instance.TryGetComponent(out NetworkObject netObj))
+            {
+                Destroy(instance);
+                return;
+            }
+
+            netObj.SpawnWithOwnership(OwnerClientId);
+            _spawnedWeapon = netObj;
+        }
+
+        private void DespawnWeapon()
+        {
+            if (_spawnedWeapon == null) return;
+
+            if (_spawnedWeapon.IsSpawned)
+                _spawnedWeapon.Despawn();
+
+            _spawnedWeapon = null;
         }
 
         private bool InventoryContains(FixedString64Bytes itemId)
@@ -92,45 +115,6 @@ namespace ShipSalvage.Player
             }
 
             return false;
-        }
-
-        private void HandleEquippedChanged(FixedString64Bytes previous, FixedString64Bytes current)
-        {
-            RefreshVisual();
-            OnEquippedChanged?.Invoke();
-        }
-
-        private void RefreshVisual()
-        {
-            DestroyVisual();
-
-            if (_handSocket == null) return;
-            if (_equippedItemId.Value.Length == 0) return;
-            if (ItemDatabase.Instance == null) return;
-            if (!ItemDatabase.Instance.GetItemById(_equippedItemId.Value.ToString(), out var item)) return;
-            if (item.EquipPrefab == null) return;
-
-            _currentVisual = Instantiate(item.EquipPrefab, _handSocket);
-            _currentVisual.transform.localPosition = Vector3.zero;
-            _currentVisual.transform.localRotation = Quaternion.identity;
-
-            _currentItem = _currentVisual.GetComponentInChildren<Item>();
-            if (_currentItem != null)
-                _currentItem.OnEquipped();
-        }
-
-        private void DestroyVisual()
-        {
-            if (_currentVisual == null) return;
-
-            if (_currentItem != null)
-            {
-                _currentItem.OnUnequipped();
-                _currentItem = null;
-            }
-
-            Destroy(_currentVisual);
-            _currentVisual = null;
         }
     }
 }

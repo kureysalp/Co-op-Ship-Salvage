@@ -154,7 +154,7 @@ Transform:
   m_GameObject: {fileID: 3354799667081593576}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.315, y: -0.277, z: 0.663}
+  m_LocalPosition: {x: 0.315, y: -0.353, z: 0.435}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -208,7 +208,9 @@ GameObject:
   - component: {fileID: 6286356644041907601}
   - component: {fileID: -3717914803955310227}
   - component: {fileID: 3399853028027738369}
-  m_Layer: 0
+  - component: {fileID: 6912787379354162942}
+  - component: {fileID: 719476863618614356}
+  m_Layer: 9
   m_Name: Player_Character
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -297,7 +299,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   _moveSpeed: 5
   _sprintSpeed: 9
-  _jumpForce: 5
+  _jumpForce: 8
   _gravity: -20
   _mouseSensitivity: 0.15
   _pitchClamp: 85
@@ -396,6 +398,43 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ShipSalvage.Player.PlayerEquipment
   ShowTopMostFoldoutHeaderGroup: 1
   _handSocket: {fileID: 7461668331544173874}
+--- !u!114 &6912787379354162942
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6735228445756196646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dbde48779f5d7f147a8d7b6de001a8a8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShipSalvage.Utils.Health
+  ShowTopMostFoldoutHeaderGroup: 1
+  _max: 100
+--- !u!136 &719476863618614356
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6735228445756196646}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.5
+  m_Height: 2
+  m_Direction: 1
+  m_Center: {x: 0, y: 1, z: 0}
 --- !u!1 &7867548968948479400
 GameObject:
   m_ObjectHideFlags: 0

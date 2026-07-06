@@ -15,7 +15,20 @@ namespace _Project.Scripts.Game
 
         [SerializeField] private GameObject _highlightTarget;
 
-        public bool CanInteract(PlayerController player) => _itemObject != null;
+        private readonly NetworkVariable<bool> _consumed = new();
+
+        public override void OnNetworkSpawn()
+        {
+            _consumed.OnValueChanged += HandleConsumedChanged;
+            ApplyConsumedState(_consumed.Value);
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            _consumed.OnValueChanged -= HandleConsumedChanged;
+        }
+
+        public bool CanInteract(PlayerController player) => _itemObject != null && !_consumed.Value;
 
         public void Highlight(bool active)
         {
@@ -23,10 +36,7 @@ namespace _Project.Scripts.Game
                 _highlightTarget.SetActive(active);
         }
 
-        public void Interact(PlayerController player)
-        {
-            PickupItemServerRpc();
-        }
+        public void Interact(PlayerController player) => PickupItemServerRpc();
 
         public string GetInteractionLabel(PlayerController player) => _interactionMessage;
 
@@ -34,6 +44,7 @@ namespace _Project.Scripts.Game
         private void PickupItemServerRpc(ServerRpcParams rpcParams = default)
         {
             if (_itemObject == null) return;
+            if (_consumed.Value) return;
 
             var clientId = rpcParams.Receive.SenderClientId;
             var player = PlayerManager.Instance.GetPlayer(clientId);
@@ -42,7 +53,21 @@ namespace _Project.Scripts.Game
             var inventoryItem = new InventoryItem(_itemObject.UId, Mathf.Max(1, _quantity));
 
             if (player.Inventory.TryAddItem(inventoryItem))
-                NetworkObject.Despawn();
+                _consumed.Value = true;
+        }
+
+        private void HandleConsumedChanged(bool previous, bool current) => ApplyConsumedState(current);
+
+        private void ApplyConsumedState(bool consumed)
+        {
+            foreach (var renderer in GetComponentsInChildren<Renderer>(true))
+                renderer.enabled = !consumed;
+
+            foreach (var collider in GetComponentsInChildren<Collider>(true))
+                collider.enabled = !consumed;
+
+            if (consumed && _highlightTarget != null)
+                _highlightTarget.SetActive(false);
         }
     }
 }

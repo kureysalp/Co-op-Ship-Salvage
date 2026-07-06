@@ -6,6 +6,7 @@ using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 
 namespace ShipSalvage.UI
 {
@@ -28,7 +29,13 @@ namespace ShipSalvage.UI
 
         private ItemHolder _dragged;
         private Transform _draggedOriginParent;
-        private int _activeHotbar = -1;
+        private int _activeHotbar;
+
+        private static readonly Key[] HotbarKeys =
+        {
+            Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5,
+            Key.Digit6, Key.Digit7, Key.Digit8, Key.Digit9
+        };
 
         public bool IsBagOpen => _bagPanel != null && _bagPanel.activeSelf;
 
@@ -44,13 +51,13 @@ namespace ShipSalvage.UI
 
             for (var i = 0; i < _bagSlots.Length; i++)
             {
-                _bagSlots[i].Configure(i);
+                _bagSlots[i].Configure(i, SlotKind.Bag);
                 _bagItemIds.Add(string.Empty);
             }
 
             for (var i = 0; i < _hotbarSlots.Length; i++)
             {
-                _hotbarSlots[i].Configure(i);
+                _hotbarSlots[i].Configure(i, SlotKind.Hotbar);
                 _hotbarItemIds.Add(string.Empty);
             }
 
@@ -158,11 +165,16 @@ namespace ShipSalvage.UI
 
             foreach (var id in _quantities.Keys)
             {
-                if (!_bagItemIds.Contains(id))
-                    AssignToFreeBagSlot(id);
+                if (_bagItemIds.Contains(id)) continue;
+
+                AssignToFreeBagSlot(id);
+
+                if (IsEquipable(id) && !_hotbarItemIds.Contains(id))
+                    AssignToFreeHotbarSlot(id);
             }
 
             Rebuild();
+            UpdateHotbarHighlights();
             RefreshEquipForActive();
         }
 
@@ -173,6 +185,18 @@ namespace ShipSalvage.UI
                 if (_bagItemIds[i].Length == 0)
                 {
                     _bagItemIds[i] = id;
+                    return;
+                }
+            }
+        }
+
+        private void AssignToFreeHotbarSlot(string id)
+        {
+            for (var i = 0; i < _hotbarItemIds.Count; i++)
+            {
+                if (_hotbarItemIds[i].Length == 0)
+                {
+                    _hotbarItemIds[i] = id;
                     return;
                 }
             }
@@ -247,24 +271,35 @@ namespace ShipSalvage.UI
             var srcId = srcList[source.Index];
             if (srcId.Length == 0) return;
 
-            if (source.Kind == SlotKind.Bag && target.Kind == SlotKind.Bag)
+            if (target.Kind == SlotKind.Bag)
             {
-                _bagItemIds[source.Index] = _bagItemIds[target.Index];
-                _bagItemIds[target.Index] = srcId;
-            }
-            else if (source.Kind == SlotKind.Bag && target.Kind == SlotKind.Hotbar)
-            {
-                if (!IsEquipable(srcId)) return;
-                _hotbarItemIds[target.Index] = srcId;
-            }
-            else if (source.Kind == SlotKind.Hotbar && target.Kind == SlotKind.Hotbar)
-            {
-                _hotbarItemIds[source.Index] = _hotbarItemIds[target.Index];
-                _hotbarItemIds[target.Index] = srcId;
+                if (source.Kind == SlotKind.Bag)
+                {
+                    _bagItemIds[source.Index] = _bagItemIds[target.Index];
+                    _bagItemIds[target.Index] = srcId;
+                }
+                else
+                {
+                    _hotbarItemIds[source.Index] = string.Empty;
+                }
             }
             else
             {
-                _hotbarItemIds[source.Index] = string.Empty;
+                if (!IsEquipable(srcId)) return;
+
+                if (source.Kind == SlotKind.Hotbar)
+                {
+                    _hotbarItemIds[source.Index] = _hotbarItemIds[target.Index];
+                    _hotbarItemIds[target.Index] = srcId;
+                }
+                else
+                {
+                    for (var i = 0; i < _hotbarItemIds.Count; i++)
+                        if (_hotbarItemIds[i] == srcId)
+                            _hotbarItemIds[i] = string.Empty;
+
+                    _hotbarItemIds[target.Index] = srcId;
+                }
             }
 
             Rebuild();
@@ -273,43 +308,41 @@ namespace ShipSalvage.UI
 
         private void HandleHotbarSelection()
         {
-            if (_hotbarSlots.Length == 0) return;
+            if (_hotbarSlots.Length == 0 || Keyboard.current == null) return;
 
-            var changed = false;
-
-            if (_player.NextAction != null && _player.NextAction.WasPressedThisFrame())
+            var max = Mathf.Min(_hotbarSlots.Length, HotbarKeys.Length);
+            for (var i = 0; i < max; i++)
             {
-                _activeHotbar = (_activeHotbar + 1 + _hotbarSlots.Length) % _hotbarSlots.Length;
-                changed = true;
+                if (!Keyboard.current[HotbarKeys[i]].wasPressedThisFrame) continue;
+                SelectHotbar(i);
+                return;
             }
-            else if (_player.PreviousAction != null && _player.PreviousAction.WasPressedThisFrame())
-            {
-                _activeHotbar = (_activeHotbar - 1 + _hotbarSlots.Length) % _hotbarSlots.Length;
-                changed = true;
-            }
+        }
 
-            if (!changed) return;
+        private void SelectHotbar(int index)
+        {
+            _activeHotbar = index;
 
+            UpdateHotbarHighlights();
+            RefreshEquipForActive();
+        }
+
+        private void UpdateHotbarHighlights()
+        {
             for (var i = 0; i < _hotbarSlots.Length; i++)
                 _hotbarSlots[i].SetActiveHighlight(i == _activeHotbar);
-
-            RefreshEquipForActive();
         }
 
         private void RefreshEquipForActive()
         {
             if (_equipment == null) return;
+            if (_activeHotbar < 0 || _activeHotbar >= _hotbarItemIds.Count) return;
 
-            var desired = string.Empty;
-            if (_activeHotbar >= 0 && _activeHotbar < _hotbarItemIds.Count)
-                desired = _hotbarItemIds[_activeHotbar];
-
+            var desired = _hotbarItemIds[_activeHotbar];
+            if (desired.Length == 0) return;
             if (_equipment.EquippedItemId.ToString() == desired) return;
 
-            if (desired.Length == 0)
-                _equipment.RequestUnequip();
-            else
-                _equipment.RequestEquip(new FixedString64Bytes(desired));
+            _equipment.RequestEquip(new FixedString64Bytes(desired));
         }
 
         private void ToggleBag()
@@ -318,6 +351,9 @@ namespace ShipSalvage.UI
 
             var open = !_bagPanel.activeSelf;
             _bagPanel.SetActive(open);
+
+            if (open)
+                Rebuild();
 
             Cursor.lockState = open ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = open;
